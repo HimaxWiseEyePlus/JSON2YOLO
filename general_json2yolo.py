@@ -1,3 +1,6 @@
+import os, argparse
+from os import listdir
+from os.path import isfile, join
 import json
 
 import cv2
@@ -247,7 +250,7 @@ def convert_ath_json(json_dir):  # dir contains json annotations and images
     print('Done. Output saved to %s' % Path(dir).absolute())
 
 
-def convert_coco_json(json_dir='../coco/annotations/', use_segments=False, cls91to80=False):
+def convert_coco_json(train_path, val_path, json_dir='../coco/annotations/', use_segments=False, cls91to80=False):
     save_dir = make_dirs()  # output directory
     coco80 = coco91_to_coco80_class()
 
@@ -282,17 +285,53 @@ def convert_coco_json(json_dir='../coco/annotations/', use_segments=False, cls91
 
             # Write
             if box[2] > 0 and box[3] > 0:  # if w > 0 and h > 0
-                cls = coco80[x['category_id'] - 1] if cls91to80 else x['category_id'] - 1  # class
-                line = cls, *(s if use_segments else box)  # cls, box or segments
-                with open((fn / f).with_suffix('.txt'), 'a') as file:
-                    file.write(('%g ' * len(line)).rstrip() % line + '\n')
+                if x['category_id'] == 1:
+                    cls = coco80[x['category_id'] - 1] if cls91to80 else x['category_id'] - 1  # class
+                    line = cls, *(s if use_segments else box)  # cls, box or segments
+                    with open((fn / f).with_suffix('.txt'), 'a') as file:
+                        file.write(('%g ' * len(line)).rstrip() % line + '\n')
+    
+    onlyfiles = [f for f in listdir(train_path) if isfile(join(train_path, f))]
+    f = open( Path(save_dir) / 'train_coco.txt', 'w')
+    for x in onlyfiles:
+        if x.find('.jpg') > 0:
+            f.write(train_path+'/'+x+'\n')
+    f.close()
+
+    onlyfiles = [f for f in listdir(val_path) if isfile(join(val_path, f))]
+    f = open( Path(save_dir) / 'test_coco.txt', 'w')
+    for x in onlyfiles:
+        if x.find('.jpg') > 0:
+            f.write(val_path+'/'+x+'\n')
+    f.close()
+
+    print('Labels path: ' + str(Path(save_dir) / 'labels'))
+    print('Data list files: ' + str(Path(save_dir) / 'train_coco.txt') + ', ' +  str(Path(save_dir) / 'test_coco.txt'))
+
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS, description='JSON2YOLO')
+    '''
+    Command line options
+    '''
+    parser.add_argument(
+        '--instances_path', type=str, required=True,
+        help='path to instances json directory')
+    parser.add_argument(
+        '--train_path', type=str, required=True,
+        help='path to training data directory')
+    parser.add_argument(
+        '--val_path', type=str, required=True,
+        help='path to val data directory')
+
+    args = parser.parse_args()
+
     source = 'COCO'
 
     if source == 'COCO':
-        convert_coco_json('../../Downloads/Objects365')  # directory with *.json
+        convert_coco_json(args.train_path, args.val_path, args.instances_path)  # directory with *.json
 
     elif source == 'infolks':  # Infolks https://infolks.info/
         convert_infolks_json(name='out',
@@ -307,5 +346,5 @@ if __name__ == '__main__':
     elif source == 'ath':  # ath format
         convert_ath_json(json_dir='../../Downloads/athena/')  # images folder
 
-    # zip results
-    # os.system('zip -r ../coco.zip ../coco')
+
+
